@@ -12,15 +12,17 @@ interface JwtPayload {
 }
 
 interface AuthenticateDependencies {
+  jwtSecret?: string;
   refreshTokenRepository?: RefreshTokenRepository;
   tokenService?: TokenService;
   userRepository?: UserRepository;
 }
 
 export function createAuthenticate(dependencies: AuthenticateDependencies = {}) {
+  const jwtSecret = dependencies.jwtSecret ?? env.JWT_SECRET;
   const refreshTokenRepository = dependencies.refreshTokenRepository ?? new RefreshTokenRepository();
   const tokenService = dependencies.tokenService ?? new TokenService({
-    jwtSecret: env.JWT_SECRET,
+    jwtSecret,
     accessTokenExpiresInSeconds: env.ACCESS_TOKEN_EXPIRES_IN_SECONDS,
     refreshTokenExpiresInSeconds: env.REFRESH_TOKEN_EXPIRES_IN_SECONDS,
   });
@@ -34,7 +36,7 @@ export function createAuthenticate(dependencies: AuthenticateDependencies = {}) 
       }
 
       const token = authHeader.split(" ")[1];
-      const auth = await resolveAuthentication(token, refreshTokenRepository, tokenService, userRepository);
+      const auth = await resolveAuthentication(token, jwtSecret, refreshTokenRepository, tokenService, userRepository);
 
       req.auth = auth;
       req.user = auth.user;
@@ -57,6 +59,7 @@ export const authenticate = createAuthenticate();
 
 async function resolveAuthentication(
   token: string,
+  jwtSecret: string,
   refreshTokenRepository: RefreshTokenRepository,
   tokenService: TokenService,
   userRepository: UserRepository,
@@ -78,7 +81,15 @@ async function resolveAuthentication(
       throw error;
     }
 
-    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, jwtSecret) as JwtPayload & { typ?: string };
+
+    // New-format tokens (with typ claim) must authenticate via the session path.
+    // If we reached here, the session lookup failed — reject rather than falling
+    // through to the legacy phone-only path which bypasses session revocation.
+    if (decoded.typ) {
+      throw new AppError("Invalid or expired token", 401, ErrorCodes.UNAUTHORIZED);
+    }
+
     const user = await userRepository.findByPhone(decoded.phone);
     if (!user || user.deletedAt) {
       throw new AppError("Invalid or expired token", 401, ErrorCodes.UNAUTHORIZED);
