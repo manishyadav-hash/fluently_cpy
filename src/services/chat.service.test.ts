@@ -347,4 +347,114 @@ describe("ChatService", () => {
     assert.equal(finalizedContent, streamed);
     assert.equal(completion.finishReason, "complete");
   });
+
+  it("stream complete() re-throws DB errors after logging", async () => {
+    const service = new ChatService({
+      createChatRepository: () => ({
+        async countRecentUserMessages() { return 0; },
+        async createConversation() { throw new Error("unused"); },
+        async createMessage(data) {
+          return {
+            content: data.content,
+            conversationId: data.conversationId,
+            createdAt: new Date("2026-03-01T10:03:00.000Z"),
+            id: data.role === "user" ? "msg_user" : "msg_tutor",
+            role: data.role,
+          };
+        },
+        async findConversationByIdForUser() {
+          return {
+            createdAt: new Date("2026-03-01T10:00:00.000Z"),
+            id: "conv_xyz",
+            lastMessageAt: null,
+            messageCount: 0,
+            userId: "usr_chat",
+          };
+        },
+        async findLatestConversationByUserId() { return null; },
+        async listMessagesForConversation() { return []; },
+        async updateConversationAfterMessages() {
+          return {
+            createdAt: new Date("2026-03-01T10:00:00.000Z"),
+            id: "conv_xyz",
+            lastMessageAt: new Date("2026-03-01T10:03:05.000Z"),
+            messageCount: 2,
+            userId: "usr_chat",
+          };
+        },
+        async updateMessageContent() {
+          throw new Error("DB write failed");
+        },
+      }),
+      runInTransaction: async callback => callback({} as never),
+      tutorService: {
+        async generateReply() { return "unused"; },
+        async *streamReply() { yield "Hello"; },
+      },
+    });
+
+    const session = await service.startMessageStream("usr_chat", "conv_xyz", "Hi");
+    await collectChunks(session.chunks);
+
+    await assert.rejects(
+      session.complete("Hello"),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.message, "DB write failed");
+        return true;
+      },
+    );
+  });
+
+  it("stream fail() swallows DB errors gracefully", async () => {
+    const service = new ChatService({
+      createChatRepository: () => ({
+        async countRecentUserMessages() { return 0; },
+        async createConversation() { throw new Error("unused"); },
+        async createMessage(data) {
+          return {
+            content: data.content,
+            conversationId: data.conversationId,
+            createdAt: new Date("2026-03-01T10:03:00.000Z"),
+            id: data.role === "user" ? "msg_user" : "msg_tutor",
+            role: data.role,
+          };
+        },
+        async findConversationByIdForUser() {
+          return {
+            createdAt: new Date("2026-03-01T10:00:00.000Z"),
+            id: "conv_xyz",
+            lastMessageAt: null,
+            messageCount: 0,
+            userId: "usr_chat",
+          };
+        },
+        async findLatestConversationByUserId() { return null; },
+        async listMessagesForConversation() { return []; },
+        async updateConversationAfterMessages() {
+          return {
+            createdAt: new Date("2026-03-01T10:00:00.000Z"),
+            id: "conv_xyz",
+            lastMessageAt: new Date("2026-03-01T10:03:05.000Z"),
+            messageCount: 2,
+            userId: "usr_chat",
+          };
+        },
+        async updateMessageContent() {
+          throw new Error("DB write failed");
+        },
+      }),
+      runInTransaction: async callback => callback({} as never),
+      tutorService: {
+        async generateReply() { return "unused"; },
+        async *streamReply() { yield "partial"; },
+      },
+    });
+
+    const session = await service.startMessageStream("usr_chat", "conv_xyz", "Hi");
+    await collectChunks(session.chunks);
+
+    // fail() should NOT throw even when the DB write fails
+    await session.fail("partial");
+  });
 });

@@ -317,6 +317,80 @@ describe("SubscriptionService", () => {
     assert.equal(updatedCancelAtPeriodEnd, true);
   });
 
+  it("rejects cancellation for trial subscriptions", async () => {
+    const service = new SubscriptionService({
+      createSubscriptionRepository: () => ({
+        async createOrUpdateSubscription() { throw new Error("unused"); },
+        async findPlanById() { return null; },
+        async findSubscriptionByUserId() {
+          return createSubscription({
+            cancelAtPeriodEnd: false,
+            status: "trial",
+            trialEndDate: new Date("2026-03-07T10:00:00.000Z"),
+          });
+        },
+        async listActivePlans() { return []; },
+        async seedPlans() { return; },
+      }),
+      createUserRepository: () => ({
+        async create() { throw new Error("unused"); },
+        async findById() { return createUser(); },
+        async findByPhone() { return createUser(); },
+        async markOnboarded() { return; },
+        async softDelete() { return; },
+        async update() { throw new Error("unused"); },
+        async updateTrialUsage() { throw new Error("unused"); },
+      }),
+      runInTransaction: async callback => callback({} as never),
+    });
+
+    await assert.rejects(
+      service.cancelCurrentSubscription("usr_abc123"),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError);
+        assert.equal(error.code, ErrorCodes.NO_ACTIVE_SUBSCRIPTION);
+        return true;
+      },
+    );
+  });
+
+  it("rejects cancellation for already-cancelled subscriptions", async () => {
+    const service = new SubscriptionService({
+      createSubscriptionRepository: () => ({
+        async createOrUpdateSubscription() { throw new Error("unused"); },
+        async findPlanById() { return null; },
+        async findSubscriptionByUserId() {
+          return createSubscription({
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: new Date("2027-02-28T10:00:00.000Z"),
+            status: "active",
+          });
+        },
+        async listActivePlans() { return []; },
+        async seedPlans() { return; },
+      }),
+      createUserRepository: () => ({
+        async create() { throw new Error("unused"); },
+        async findById() { return createUser(); },
+        async findByPhone() { return createUser(); },
+        async markOnboarded() { return; },
+        async softDelete() { return; },
+        async update() { throw new Error("unused"); },
+        async updateTrialUsage() { throw new Error("unused"); },
+      }),
+      runInTransaction: async callback => callback({} as never),
+    });
+
+    await assert.rejects(
+      service.cancelCurrentSubscription("usr_abc123"),
+      (error: unknown) => {
+        assert.ok(error instanceof AppError);
+        assert.equal(error.code, ErrorCodes.ALREADY_CANCELLED);
+        return true;
+      },
+    );
+  });
+
   it("returns derived invoice details for active paid subscriptions", async () => {
     const service = new SubscriptionService({
       billingService: {

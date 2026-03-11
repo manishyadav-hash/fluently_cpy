@@ -227,7 +227,7 @@ export class SubscriptionService implements SubscriptionServiceContract {
     return this.runInTransaction(async db => {
       const subscriptionRepository = this.createSubscriptionRepository(db);
       const userRepository = this.createUserRepository(db);
-      await this.requireUser(userId, userRepository);
+      const user = await this.requireUser(userId, userRepository);
       const existingSubscription = await subscriptionRepository.findSubscriptionByUserId(userId);
       if (this.hasBlockingSubscription(existingSubscription?.status ?? null)) {
         throw new AppError("User already has an active subscription.", 409, ErrorCodes.ACTIVE_SUBSCRIPTION);
@@ -249,7 +249,7 @@ export class SubscriptionService implements SubscriptionServiceContract {
         paymentUrl,
       });
 
-      await userRepository.updateTrialUsage(userId, this.mapUserSubscriptionStatus("pending"), existingSubscription?.status === "trial" ? this.now() : (await userRepository.findById(userId))?.trialUsedAt ?? null);
+      await userRepository.updateTrialUsage(userId, this.mapUserSubscriptionStatus("pending"), existingSubscription?.status === "trial" ? this.now() : user.trialUsedAt);
 
       return normalizeSubscription(subscription);
     });

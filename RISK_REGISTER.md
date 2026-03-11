@@ -12,3 +12,5 @@
 | R6 | In-memory rate limiting (chat) | Medium | Replace with Redis-backed rate limiting | Not suitable for multi-instance deployment |
 | R7 | No request logging/tracing | Medium | Add structured logging (pino/winston) | Essential for production debugging |
 | R8 | No database connection pooling configuration | Low | Configure Prisma connection pool for production | Default pool may be insufficient under load |
+| R9 | Trial subscriptions cannot be cancelled via API | Low | Design decision per API contract — users on trial must wait for expiry | Consider adding trial cancellation if users request it |
+| R10 | Chat stream tutor message may persist as empty string on complete() failure | Medium | Error handling added (QA-010) — failures now logged and re-thrown to caller | SSE controller should relay error to client |

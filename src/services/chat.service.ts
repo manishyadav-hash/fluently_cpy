@@ -221,11 +221,20 @@ export class ChatService implements ChatServiceContract {
     return {
       chunks: this.tutorService.streamReply({ content, userId }),
       complete: async fullContent => {
-        await repository.updateMessageContent(initialState.tutorMessage.id, fullContent);
+        try {
+          await repository.updateMessageContent(initialState.tutorMessage.id, fullContent);
+        } catch (error) {
+          console.error(`[chat] Failed to save tutor message ${initialState.tutorMessage.id}:`, error);
+          throw error;
+        }
         return { finishReason: "complete" as const };
       },
       fail: async partialContent => {
-        await repository.updateMessageContent(initialState.tutorMessage.id, partialContent);
+        try {
+          await repository.updateMessageContent(initialState.tutorMessage.id, partialContent);
+        } catch (error) {
+          console.error(`[chat] Failed to save partial tutor message ${initialState.tutorMessage.id}:`, error);
+        }
       },
       tutorMessageId: initialState.tutorMessage.id,
       userMessageId: initialState.userMessage.id,
