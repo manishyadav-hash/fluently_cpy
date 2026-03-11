@@ -80,6 +80,7 @@ model User {
   avatarUrl          String?
   isOnboarded        Boolean            @default(false)
   subscriptionStatus SubscriptionStatus @default(none)
+  trialUsedAt        DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   deletedAt          DateTime?
@@ -98,6 +99,7 @@ model Otp {
   id         String    @id @default(cuid())
   identifier String
   code       String
+  attemptCount Int     @default(0)
   expiresAt  DateTime
   usedAt     DateTime?
   createdAt  DateTime  @default(now())

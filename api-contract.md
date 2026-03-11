@@ -648,6 +648,33 @@ DELETE /v1/users/me/avatar
 
 ---
 
+### 4.5 Delete Account
+
+Soft-deletes the authenticated user's account. The account data is retained but marked as deleted and the user will no longer be able to authenticate.
+
+**Screen**: Profile — "Delete Account" menu item
+
+```
+DELETE /v1/users/me
+```
+
+**Auth Required**: Yes
+
+**Request Body**: None
+
+**Response** `200 OK`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Account deleted successfully"
+  }
+}
+```
+
+---
+
 ## 5. Onboarding & Questionnaire
 
 ### 5.1 Submit Questionnaire

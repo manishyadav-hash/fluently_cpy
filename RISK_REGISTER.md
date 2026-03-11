@@ -1,0 +1,14 @@
+# Fluently API — Risk Register
+
+## Known Risks (Not Fixable in This Audit)
+
+| ID | Risk | Severity | Mitigation | Notes |
+|----|------|----------|------------|-------|
+| R1 | Placeholder OTP delivery logs codes to console | High | Replace with real SMS provider before production | Security risk if console logs are accessible |
+| R2 | Placeholder billing returns static URLs | Medium | Replace with real payment processor | No real payment flow |
+| R3 | Placeholder chat tutor returns static responses | Low | Replace with real LLM integration | Functional but not useful |
+| R4 | Placeholder lesson feedback returns static scores | Low | Replace with real speech analysis | Functional but not useful |
+| R5 | Local avatar storage writes to filesystem | Medium | Replace with cloud storage (S3/GCS) | Not suitable for multi-instance deployment |
+| R6 | In-memory rate limiting (chat) | Medium | Replace with Redis-backed rate limiting | Not suitable for multi-instance deployment |
+| R7 | No request logging/tracing | Medium | Add structured logging (pino/winston) | Essential for production debugging |
+| R8 | No database connection pooling configuration | Low | Configure Prisma connection pool for production | Default pool may be insufficient under load |

@@ -204,7 +204,7 @@ CREATE TABLE "SubscriptionPlan" (
     "priceAmount"       INTEGER NOT NULL,
     "priceCurrency"     TEXT NOT NULL DEFAULT 'INR',
     "monthlyEquivalent" INTEGER,
-    "badge"             TEXT,
+    "badge"             TEXT DEAFULT '',
     "description"       TEXT,
     "isActive"          BOOLEAN NOT NULL DEFAULT true,
     "createdAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

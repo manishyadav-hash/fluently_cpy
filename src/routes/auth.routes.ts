@@ -1,14 +1,34 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { AuthController } from "../controllers/auth.controller";
+import { authenticate } from "../middleware/auth";
 import { validate } from "../middleware/validate";
-import { sendOtpSchema, sendOtpValidation, verifyOtpSchema, verifyOtpValidation } from "../validations/auth.validation";
+import type { AuthServiceContract } from "../services/auth.service";
+import {
+  refreshTokenSchema,
+  refreshTokenValidation,
+  sendOtpSchema,
+  sendOtpValidation,
+  verifyOtpSchema,
+  verifyOtpValidation,
+} from "../validations/auth.validation";
 
-export const authRouter = Router();
+interface AuthRouterOptions {
+  authenticateMiddleware?: RequestHandler;
+  service?: AuthServiceContract;
+}
 
-const authController = new AuthController();
+export function createAuthRouter(options: AuthRouterOptions = {}) {
+  const authRouter = Router();
+  const authController = new AuthController(options.service);
+  const authenticateMiddleware = options.authenticateMiddleware ?? authenticate;
 
-// POST /api/auth/otp/send    - Send OTP to phone/email
-authRouter.post("/otp/send", validate(sendOtpSchema, sendOtpValidation), authController.sendOtp);
+  authRouter.post("/otp/send", validate(sendOtpSchema, sendOtpValidation), authController.sendOtp);
+  authRouter.post("/otp/verify", validate(verifyOtpSchema, verifyOtpValidation), authController.verifyOtp);
+  authRouter.post("/otp/resend", validate(sendOtpSchema, sendOtpValidation), authController.resendOtp);
+  authRouter.post("/token/refresh", validate(refreshTokenSchema, refreshTokenValidation), authController.refreshToken);
+  authRouter.post("/logout", authenticateMiddleware, authController.logout);
 
-// POST /api/auth/otp/verify  - Verify OTP and authenticate
-authRouter.post("/otp/verify", validate(verifyOtpSchema, verifyOtpValidation), authController.verifyOtp);
+  return authRouter;
+}
+
+export const authRouter = createAuthRouter();

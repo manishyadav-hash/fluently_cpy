@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodIssue, ZodSchema } from "zod";
+import { ErrorCodes } from "../errors/error-codes";
+import { sendError } from "../utils/response";
 
 interface ValidationErrorMetadata {
   code: string;
@@ -30,7 +32,7 @@ function selectValidationError(issues: ZodIssue[], config?: ValidationConfig): V
   }
 
   return {
-    code: "VALIDATION_ERROR",
+    code: ErrorCodes.VALIDATION_ERROR,
     message: issues[0]?.message || "Validation failed",
   };
 }
@@ -42,15 +44,12 @@ export function validate(schema: ZodSchema, config?: ValidationConfig) {
       const flattened = result.error.flatten();
       const primaryError = selectValidationError(result.error.issues, config);
 
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: primaryError.code,
-          message: primaryError.message,
-          details: {
-            field_errors: flattened.fieldErrors,
-            form_errors: flattened.formErrors,
-          },
+      return sendError(res, 400, {
+        code: primaryError.code,
+        message: primaryError.message,
+        details: {
+          field_errors: flattened.fieldErrors,
+          form_errors: flattened.formErrors,
         },
       });
     }

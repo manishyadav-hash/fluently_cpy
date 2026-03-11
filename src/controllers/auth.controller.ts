@@ -1,17 +1,20 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
-import { OtpService } from "../services/otp.service";
-import { prisma } from "../prisma/client";
-import { env } from "../config/env";
-import { formatUserResponse, sendSuccess } from "../utils/response";
-
-const otpService = new OtpService();
+import {
+  serializeLogoutResponse,
+  serializeRefreshTokenResponse,
+  serializeSendOtpResponse,
+  serializeVerifyOtpResponse,
+} from "../serializers/auth.serializer";
+import { AuthService, type AuthServiceContract } from "../services/auth.service";
+import { sendSuccess } from "../utils/response";
 
 export class AuthController {
+  constructor(private readonly authService: AuthServiceContract = new AuthService()) {}
+
   sendOtp = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await otpService.send(req.body.phone);
-      sendSuccess(res, { otp_sent: true });
+      const result = await this.authService.sendOtp(req.body.phone);
+      sendSuccess(res, serializeSendOtpResponse(result));
     } catch (error) {
       next(error);
     }
@@ -19,24 +22,35 @@ export class AuthController {
 
   verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await otpService.verify(req.body.phone, req.body.code);
+      const result = await this.authService.verifyOtp(req.body.phone, req.body.otp);
+      sendSuccess(res, serializeVerifyOtpResponse(result));
+    } catch (error) {
+      next(error);
+    }
+  };
 
-      const user = await prisma.user.upsert({
-        where: { phone: req.body.phone },
-        update: {},
-        create: { phone: req.body.phone },
-      });
+  resendOtp = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.authService.resendOtp(req.body.phone);
+      sendSuccess(res, serializeSendOtpResponse(result));
+    } catch (error) {
+      next(error);
+    }
+  };
 
-      const isNewUser = user.createdAt.getTime() === user.updatedAt.getTime();
-      const token = jwt.sign({ phone: req.body.phone }, env.JWT_SECRET, { expiresIn: "7d" });
+  refreshToken = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.authService.refreshToken(req.body.refresh_token);
+      sendSuccess(res, serializeRefreshTokenResponse(result));
+    } catch (error) {
+      next(error);
+    }
+  };
 
-      sendSuccess(res, {
-        access_token: token,
-        token_type: "Bearer",
-        expires_in: 604800,
-        user: formatUserResponse(user),
-        is_new_user: isNewUser,
-      });
+  logout = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.authService.logout(req.auth!.sessionId);
+      sendSuccess(res, serializeLogoutResponse(result));
     } catch (error) {
       next(error);
     }

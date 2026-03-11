@@ -1,15 +1,17 @@
 import { Request, Response, NextFunction } from "express";
-import { UserService } from "../services/user.service";
-import { formatUserResponse, sendSuccess } from "../utils/response";
 import { AppError } from "../errors/app-error";
-
-const userService = new UserService();
+import { ErrorCodes } from "../errors/error-codes";
+import { serializeUser } from "../serializers/user.serializer";
+import { UserService, type UserServiceContract } from "../services/user.service";
+import { sendSuccess } from "../utils/response";
 
 export class UserController {
+  constructor(private readonly userService: UserServiceContract = new UserService()) {}
+
   getProfile = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = req.user!;
-      sendSuccess(res, formatUserResponse(user));
+      sendSuccess(res, serializeUser(user));
     } catch (error) {
       next(error);
     }
@@ -17,8 +19,8 @@ export class UserController {
 
   updateProfile = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const user = await userService.updateProfile(req.user!.id, req.body);
-      sendSuccess(res, formatUserResponse(user));
+      const user = await this.userService.updateProfile(req.user!.id, req.body);
+      sendSuccess(res, serializeUser(user));
     } catch (error) {
       next(error);
     }
@@ -27,9 +29,9 @@ export class UserController {
   uploadAvatar = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.file) {
-        throw new AppError("No file provided", 400, "INVALID_FILE_TYPE");
+        throw new AppError("No file provided", 400, ErrorCodes.INVALID_FILE_TYPE);
       }
-      const avatarUrl = await userService.uploadAvatar(req.user!.id, req.file);
+      const avatarUrl = await this.userService.uploadAvatar(req.user!.id, req.file);
       sendSuccess(res, { avatar_url: avatarUrl });
     } catch (error) {
       next(error);
@@ -38,7 +40,7 @@ export class UserController {
 
   deleteAvatar = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await userService.deleteAvatar(req.user!.id);
+      await this.userService.deleteAvatar(req.user!.id);
       sendSuccess(res, { avatar_url: null });
     } catch (error) {
       next(error);
@@ -47,7 +49,7 @@ export class UserController {
 
   deleteAccount = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      await userService.deleteAccount(req.user!.id);
+      await this.userService.deleteAccount(req.user!.id);
       sendSuccess(res, { message: "Account deleted successfully" });
     } catch (error) {
       next(error);

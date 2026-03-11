@@ -1,32 +1,67 @@
 import { Response } from "express";
-import { User } from "@prisma/client";
+import { ErrorCodes } from "../errors/error-codes";
 
-export interface UserResponse {
-  id: string;
-  name: string | null;
-  phone: string;
-  email: string | null;
-  avatar_url: string | null;
-  is_onboarded: boolean;
-  subscription_status: string;
-  created_at: string;
-  updated_at: string;
+interface ErrorEnvelopeInput {
+  code: string;
+  details?: unknown;
+  message: string;
 }
 
-export function formatUserResponse(user: User): UserResponse {
+function buildMeta() {
   return {
-    id: user.id,
-    name: user.name,
-    phone: user.phone,
-    email: user.email,
-    avatar_url: user.avatarUrl,
-    is_onboarded: user.isOnboarded,
-    subscription_status: user.subscriptionStatus,
-    created_at: user.createdAt.toISOString(),
-    updated_at: user.updatedAt.toISOString(),
+    timestamp: new Date().toISOString(),
   };
 }
 
+export function sendError(
+  res: Response,
+  statusCode: number,
+  error: ErrorEnvelopeInput,
+  headers?: Record<string, string>,
+) {
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    res.setHeader(key, value);
+  }
+
+  return res.status(statusCode).json({
+    success: false,
+    error: {
+      code: error.code,
+      message: error.message,
+      ...(error.details === undefined ? {} : { details: error.details }),
+    },
+    meta: buildMeta(),
+  });
+}
+
 export function sendSuccess(res: Response, data: unknown, statusCode: number = 200) {
-  return res.status(statusCode).json({ success: true, data });
+  return res.status(statusCode).json({
+    success: true,
+    data,
+    meta: buildMeta(),
+  });
+}
+
+export function sendPaginatedSuccess(
+  res: Response,
+  data: unknown,
+  pagination: {
+    has_more: boolean;
+    next_cursor: string | null;
+  },
+  statusCode: number = 200,
+) {
+  return res.status(statusCode).json({
+    success: true,
+    data,
+    pagination,
+    meta: buildMeta(),
+  });
+}
+
+export function sendInternalError(res: Response) {
+  return sendError(res, 500, {
+    code: ErrorCodes.INTERNAL_ERROR,
+    message: "Internal server error",
+  });
 }

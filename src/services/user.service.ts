@@ -1,11 +1,37 @@
 import { User } from "@prisma/client";
-import fs from "fs";
-import path from "path";
 import { UserRepository } from "../repositories/user.repository";
 import { AppError } from "../errors/app-error";
+import { ErrorCodes } from "../errors/error-codes";
+import { LocalAvatarStorageService, type AvatarStorageContract } from "./avatar-storage.service";
 
-export class UserService {
-  private repo = new UserRepository();
+interface UserRepositoryPort {
+  findById(id: string): Promise<User | null>;
+  findByPhone(phone: string): Promise<User | null>;
+  markOnboarded(id: string): Promise<void>;
+  softDelete(id: string): Promise<void>;
+  update(id: string, data: { avatarUrl?: string | null; email?: string; name?: string }): Promise<User>;
+}
+
+interface UserServiceDependencies {
+  avatarStorage?: AvatarStorageContract;
+  userRepository?: UserRepositoryPort;
+}
+
+export interface UserServiceContract {
+  deleteAccount(userId: string): Promise<void>;
+  deleteAvatar(userId: string): Promise<void>;
+  updateProfile(userId: string, data: { email?: string; name?: string }): Promise<User>;
+  uploadAvatar(userId: string, file: Express.Multer.File): Promise<string>;
+}
+
+export class UserService implements UserServiceContract {
+  private readonly avatarStorage: AvatarStorageContract;
+  private readonly repo: UserRepositoryPort;
+
+  constructor(dependencies: UserServiceDependencies = {}) {
+    this.avatarStorage = dependencies.avatarStorage ?? new LocalAvatarStorageService();
+    this.repo = dependencies.userRepository ?? new UserRepository();
+  }
 
   async getProfile(userId: string): Promise<User> {
     const user = await this.repo.findById(userId);
@@ -18,31 +44,14 @@ export class UserService {
       return await this.repo.update(userId, data);
     } catch (error: any) {
       if (error.code === "P2002" && error.meta?.target?.includes("email")) {
-        throw new AppError("Email already in use", 409, "EMAIL_CONFLICT");
+        throw new AppError("Email already in use", 409, ErrorCodes.EMAIL_CONFLICT);
       }
       throw error;
     }
   }
 
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<string> {
-    const ext = path.extname(file.originalname).toLowerCase() ||
-      (file.mimetype === "image/png" ? ".png" : ".jpg");
-    const filename = `${userId}${ext}`;
-    const uploadDir = path.join(__dirname, "../../public/uploads/avatars");
-
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    // Remove old avatar files for this user (may have different extension)
-    const existingFiles = fs.readdirSync(uploadDir).filter(f => f.startsWith(userId));
-    for (const existing of existingFiles) {
-      fs.unlinkSync(path.join(uploadDir, existing));
-    }
-
-    fs.writeFileSync(path.join(uploadDir, filename), file.buffer);
-
-    const avatarUrl = `/uploads/avatars/${filename}`;
+    const avatarUrl = await this.avatarStorage.saveAvatar(userId, file);
     await this.repo.update(userId, { avatarUrl });
     return avatarUrl;
   }
@@ -50,10 +59,7 @@ export class UserService {
   async deleteAvatar(userId: string): Promise<void> {
     const user = await this.repo.findById(userId);
     if (user?.avatarUrl) {
-      const filePath = path.join(__dirname, "../../public", user.avatarUrl);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      await this.avatarStorage.deleteAvatar(user.avatarUrl);
     }
     await this.repo.update(userId, { avatarUrl: null });
   }
