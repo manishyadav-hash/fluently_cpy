@@ -70,12 +70,14 @@ function createChatService(): ChatServiceContract {
 }
 
 function createApp(chatService: ChatServiceContract) {
-  const app = express();
-  app.use(express.json());
-  app.use("/v1/chat", createChatRouter({
+  const routerOptions = {
     authenticateMiddleware: createAuthMiddleware(),
     chatService,
-  }));
+  };
+  const app = express();
+  app.use(express.json());
+  app.use("/v1/chat", createChatRouter(routerOptions));
+  app.use("/api/chat", createChatRouter(routerOptions));
   app.use(errorHandler);
   return app;
 }
@@ -447,6 +449,24 @@ describe("chat routes", () => {
 
     assert.equal(response.statusCode, 400);
     assert.equal(response.json<{ error: { code: string } }>().error.code, ErrorCodes.EMPTY_MESSAGE);
+  });
+
+  it("keeps /api/chat/suggestions as a compatibility alias", async () => {
+    const chatService = createChatService();
+    chatService.getSuggestions = async () => [
+      { id: "sug_1", label: "Grammar", prompt: "Help" },
+    ];
+    const app = createApp(chatService);
+    const client = createTestClient(app);
+
+    const response = await client.request({
+      method: "GET",
+      path: "/api/chat/suggestions",
+      headers: { authorization: "Bearer phase-5" },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json<{ data: Array<{ id: string }> }>().data[0]?.id, "sug_1");
   });
 
   it("returns chat rate-limit metadata for POST /v1/chat/conversations/:conversation_id/stream", async () => {

@@ -44,12 +44,14 @@ function createAuthMiddleware(): RequestHandler {
 }
 
 function createApp(service: QuestionnaireServiceContract) {
-  const app = express();
-  app.use(express.json());
-  app.use("/v1/onboarding", createQuestionnaireRouter({
+  const routerOptions = {
     authenticateMiddleware: createAuthMiddleware(),
     questionnaireService: service,
-  }));
+  };
+  const app = express();
+  app.use(express.json());
+  app.use("/v1/onboarding", createQuestionnaireRouter(routerOptions));
+  app.use("/api/onboarding", createQuestionnaireRouter(routerOptions));
   app.use(errorHandler);
   return app;
 }
@@ -179,5 +181,44 @@ describe("questionnaire routes", () => {
 
     assert.equal(response.statusCode, 409);
     assert.equal(response.json<{ error: { code: string } }>().error.code, "ALREADY_COMPLETED");
+  });
+
+  it("keeps /api/onboarding/questionnaire as a compatibility alias", async () => {
+    const service: QuestionnaireServiceContract = {
+      async getPersonalizedPlan() { throw new Error("unused"); },
+      async submitQuestionnaire() {
+        return {
+          questionnaire_completed: true,
+          personalized_plan: {
+            goal_label: "Office communication",
+            challenge_label: "Words don't come quickly",
+            daily_practice_minutes: 20,
+            milestones: [{ week: 1, label: "Stop translating in mind" }],
+            plan_features: ["Daily speaking practice (20 mins)"],
+            social_proof: "92% learners improved confidence in 21 days",
+          },
+        };
+      },
+    };
+    const app = createApp(service);
+    const client = createTestClient(app);
+
+    const response = await client.request({
+      method: "POST",
+      path: "/api/onboarding/questionnaire",
+      headers: { authorization: "Bearer phase-2" },
+      json: {
+        learning_goal: "office_communication",
+        speaking_challenge: "words_dont_come",
+        thirty_day_goal: "clear_interviews",
+        daily_practice_minutes: 20,
+      },
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(
+      response.json<{ data: { questionnaire_completed: boolean } }>().data.questionnaire_completed,
+      true,
+    );
   });
 });

@@ -44,12 +44,14 @@ function createAuthMiddleware(): RequestHandler {
 }
 
 function createApp(service: SubscriptionServiceContract) {
-  const app = express();
-  app.use(express.json());
-  app.use("/v1/subscriptions", createSubscriptionRouter({
+  const routerOptions = {
     authenticateMiddleware: createAuthMiddleware(),
     subscriptionService: service,
-  }));
+  };
+  const app = express();
+  app.use(express.json());
+  app.use("/v1/subscriptions", createSubscriptionRouter(routerOptions));
+  app.use("/api/subscriptions", createSubscriptionRouter(routerOptions));
   app.use(errorHandler);
   return app;
 }
@@ -415,5 +417,35 @@ describe("subscription routes", () => {
 
     assert.equal(response.statusCode, 404);
     assert.equal(response.json<{ error: { code: string } }>().error.code, "NO_INVOICE");
+  });
+
+  it("keeps /api/subscriptions/plans as a compatibility alias", async () => {
+    const service: SubscriptionServiceContract = {
+      async cancelCurrentSubscription() { throw new Error("unused"); },
+      async createSubscription() { throw new Error("unused"); },
+      async getAvailablePlans() {
+        return {
+          trialOffer: { autoRenew: false, benefits: ["Speak with Confidence", "Crack Interviews", "Ace Exams"], durationDays: 7, priceAmount: 9, priceCurrency: "INR", warningText: "Missing this offer could slow your progress" },
+          plans: [
+            { badge: "BEST FOR YOUR GOAL", description: null, id: "plan_yearly", interval: "year" as const, monthlyEquivalent: 67, name: "Yearly Plan", priceAmount: 799, priceCurrency: "INR" },
+            { badge: null, description: "Matches your 20-min daily plan", id: "plan_monthly", interval: "month" as const, monthlyEquivalent: 199, name: "Monthly Plan", priceAmount: 199, priceCurrency: "INR" },
+          ],
+        };
+      },
+      async getCurrentSubscription() { throw new Error("unused"); },
+      async getLatestInvoice() { throw new Error("unused"); },
+      async startTrial() { throw new Error("unused"); },
+    };
+    const app = createApp(service);
+    const client = createTestClient(app);
+
+    const response = await client.request({
+      method: "GET",
+      path: "/api/subscriptions/plans",
+      headers: { authorization: "Bearer phase-3" },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json<{ data: { plans: Array<{ id: string }> } }>().data.plans[0]?.id, "plan_yearly");
   });
 });

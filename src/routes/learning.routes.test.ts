@@ -68,12 +68,14 @@ function createLearningService(): LearningServiceContract {
 }
 
 function createApp(service: LearningServiceContract) {
-  const app = express();
-  app.use(express.json());
-  app.use("/v1", createLearningRouter({
+  const routerOptions = {
     authenticateMiddleware: createAuthMiddleware(),
     learningService: service,
-  }));
+  };
+  const app = express();
+  app.use(express.json());
+  app.use("/v1", createLearningRouter(routerOptions));
+  app.use("/api", createLearningRouter(routerOptions));
   app.use(errorHandler);
   return app;
 }
@@ -565,5 +567,23 @@ describe("learning routes", () => {
 
     assert.equal(response.statusCode, 401);
     assert.equal(response.json<{ error: { code: string } }>().error.code, ErrorCodes.UNAUTHORIZED);
+  });
+
+  it("keeps /api/modules as a compatibility alias", async () => {
+    const service = createLearningService();
+    service.listModules = async () => [
+      { id: "mod_1", lessonsTotal: 5, lessonsCompleted: 0, title: "Week 1", weekNumber: 1, status: "in_progress", lessons: [] },
+    ];
+    const app = createApp(service);
+    const client = createTestClient(app);
+
+    const response = await client.request({
+      method: "GET",
+      path: "/api/modules",
+      headers: { authorization: "Bearer phase-4" },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json<{ data: Array<{ id: string }> }>().data[0]?.id, "mod_1");
   });
 });
