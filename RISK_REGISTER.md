@@ -14,3 +14,6 @@
 | R8 | No database connection pooling configuration | Low | Configure Prisma connection pool for production | Default pool may be insufficient under load |
 | R9 | Trial subscriptions cannot be cancelled via API | Low | Design decision per API contract — users on trial must wait for expiry | Consider adding trial cancellation if users request it |
 | R10 | Chat stream tutor message may persist as empty string on complete() failure | Medium | Error handling added (QA-010) — failures now logged and re-thrown to caller | SSE controller should relay error to client |
+| R11 | `express-rate-limit` dependency installed but not wired as middleware | Low | Wire up as global rate limiter before production, or remove from package.json | Available but unused |
+| R12 | Multer stores 25MB audio files in RAM (memory storage) | Medium | Switch to disk or streaming storage for production | Memory pressure under concurrent uploads |
+| R13 | Body size limit (100kb) not testable via light-my-request | Low | Verify manually or with integration tests using real HTTP | In-process test client bypasses content-length enforcement |
