@@ -3,3 +3,6 @@ dist/
 .env
 *.log
 public/uploads/
+public/src/
+docs/
+output/
