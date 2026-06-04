@@ -1,0 +1,103 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum QuestionType {
+  mcq
+  single_choice
+  speak_to_text
+  text_to_speech
+  fill_in_blank
+}
+
+enum LessonType {
+  speaking
+  audio
+  quiz
+  match
+  reading
+  writing
+  mixed
+}
+
+model Module {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  weekNo      Int      @unique @map("week_no")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lessons Lesson[]
+
+  @@map("modules")
+}
+
+model Lesson {
+  id          String   @id @default(uuid()) @db.Uuid
+  moduleId    String   @map("module_id") @db.Uuid
+  title       String
+  lessonType  LessonType @default(mixed) @map("lesson_type")
+  thumbnail   String?  @map("thumbnail")
+  duration    String?  @map("duration")
+  lessonOrder Int      @map("lesson_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  module    Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@unique([moduleId, lessonOrder])
+  @@map("lessons")
+}
+
+model Question {
+  id            String       @id @default(uuid()) @db.Uuid
+  lessonId      String       @map("lesson_id") @db.Uuid
+  questionType  QuestionType @map("question_type")
+  question      String
+  audioUrl      String?      @map("audio_url")
+  imageUrl      String?      @map("image_url")
+  correctAnswer String?      @map("correct_answer")
+  questionOrder Int          @map("question_order")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  lesson   Lesson           @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  options  QuestionOption[]
+  attempts QuestionAttempt[]
+
+  @@unique([lessonId, questionOrder])
+  @@map("questions")
+}
+
+model QuestionOption {
+  id         String  @id @default(uuid()) @db.Uuid
+  questionId String  @map("question_id") @db.Uuid
+  optionText String  @map("option_text")
+  isCorrect  Boolean @default(false) @map("is_correct")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, optionText])
+  @@map("question_options")
+}
+
+
+model QuestionAttempt {
+  id         String   @id @default(uuid()) @db.Uuid
+  questionId String   @map("question_id") @db.Uuid
+  answer     String?
+  isCorrect  Boolean  @default(false) @map("is_correct")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("question_attempts")
+}
+
