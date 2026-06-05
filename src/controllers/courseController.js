@@ -26,7 +26,7 @@ const normalizeCourse = (course) => ({
   thumbnail_url: course.thumbnailUrl,
   created_at: course.createdAt
 });
-
+//method to create a course with weeks and lessons, get all courses with weeks and lessons count, get course details with weeks and lessons, update course details and weeks, delete course, add lesson to week, remove lesson from week and reorder lessons in a week
 const createCourse = async (req, res) => {
   try {
     const { title, description, thumbnail_url, level, audience, duration_weeks, status } = req.body;
