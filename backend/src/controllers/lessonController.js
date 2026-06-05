@@ -32,7 +32,7 @@ const upload = multer({
 const createLesson = async (req, res) => {
   try {
     const { moduleId } = req.params;
-    const { title, lesson_order, thumbnail, duration, lesson_type } = req.body;
+    const { title, lesson_order, thumbnail, duration, lesson_type, lesson_level } = req.body;
 
     if (!moduleId || !title || !lesson_order) {
       return res.status(400).json({
@@ -73,6 +73,7 @@ const createLesson = async (req, res) => {
       data: {
         moduleId,
         title,
+        ...(lesson_level !== undefined ? { lessonLevel: lesson_level } : {}),
         ...(lesson_type !== undefined ? { lessonType: lesson_type } : {}),
         lessonOrder: lesson_order,
         ...(thumbnail !== undefined ? { thumbnail } : {}),
@@ -157,6 +158,29 @@ const getLessons = async (req, res) => {
   }
 };
 
+const getAllLessons = async (_req, res) => {
+  try {
+    const lessons = await prisma.lesson.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Lessons retrieved successfully',
+      data: lessons
+    });
+  } catch (error) {
+    console.log(error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
 const getLessonById = async (req, res) => {
   try {
     const { lessonId } = req.params;
@@ -214,7 +238,7 @@ const getLessonById = async (req, res) => {
 const updateLesson = async (req, res) => {
   try {
     const { lessonId } = req.params;
-    const { title, lesson_order, thumbnail, duration, lesson_type } = req.body;
+    const { title, lesson_order, thumbnail, duration, lesson_type, lesson_level } = req.body;
 
     if (!lessonId) {
       return res.status(400).json({
@@ -229,6 +253,7 @@ const updateLesson = async (req, res) => {
       },
       data: {
         ...(title !== undefined ? { title } : {}),
+        ...(lesson_level !== undefined ? { lessonLevel: lesson_level } : {}),
         ...(lesson_type !== undefined ? { lessonType: lesson_type } : {}),
         ...(lesson_order !== undefined ? { lessonOrder: lesson_order } : {}),
         ...(thumbnail !== undefined ? { thumbnail } : {}),
@@ -336,6 +361,7 @@ const uploadLessonThumbnail = async (req, res) => {
 module.exports = {
   createLesson,
   getLessons,
+  getAllLessons,
   getLessonById,
   updateLesson,
   deleteLesson,

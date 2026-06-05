@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const moduleRoutes = require('./routes/moduleRoute');
+const courseRoutes = require('./routes/courseRoute');
 const lessonRoutes = require('./routes/lessonRoute');
 const questionRoutes = require('./routes/questionRoute');
 const questionOptionRoutes = require('./routes/questionOptionRoute');
@@ -17,6 +18,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/admin/modules', moduleRoutes);
+app.use('/api/admin/courses', courseRoutes);
 app.use('/api/admin', lessonRoutes);
 app.use('/api/admin', questionRoutes);
 app.use('/api/admin', questionOptionRoutes);
