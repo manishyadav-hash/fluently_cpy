@@ -2,6 +2,8 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Outlet, NavLink } from "react-router-dom";
 import Sidebar from "./components/Sidebar.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import Courses from "./pages/Courses.jsx";
+import CourseDetail from "./pages/CourseDetail.jsx";
 import Modules from "./pages/Modules.jsx";
 import Lessons from "./pages/Lessons.jsx";
 import LessonDetail from "./pages/LessonDetail.jsx";
@@ -12,6 +14,7 @@ import NotFound from "./pages/NotFound.jsx";
 
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/" },
+  { label: "Courses", path: "/courses" },
   { label: "Modules", path: "/modules" },
   { label: "Lessons", path: "/lessons" },
   { label: "Questions", path: "/questions" },
@@ -76,6 +79,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route element={<AppShell />}>
           <Route index element={<Dashboard />} />
+          <Route path="/courses" element={<Courses />} />
+          <Route path="/courses/:courseId" element={<CourseDetail />} />
           <Route path="/modules" element={<Modules />} />
           <Route path="/lessons" element={<Lessons />} />
           <Route path="/lessons/:lessonId" element={<LessonDetail />} />

@@ -11,11 +11,18 @@ const LESSON_TYPES = [
   { label: "Mixed", value: "mixed" }
 ];
 
+const LESSON_LEVELS = [
+  { label: "Beginner", value: "beginner" },
+  { label: "Intermediate", value: "intermediate" },
+  { label: "Advanced", value: "advanced" }
+];
+
 const INITIAL_FORM = {
   moduleId: "",
   title: "",
   lessonOrder: "1",
   lessonType: "mixed",
+  lessonLevel: "beginner",
   duration: ""
 };
 
@@ -43,6 +50,7 @@ function LessonModal({ isOpen, onClose, modules = [], onCreated, lessonToEdit = 
         title: lessonToEdit.title || "",
         lessonOrder: String(lessonToEdit.lessonOrder || "1"),
         lessonType: lessonToEdit.lessonType || "mixed",
+        lessonLevel: lessonToEdit.lessonLevel || "beginner",
         duration: lessonToEdit.duration === "N/A" ? "" : lessonToEdit.duration || ""
       });
       setThumbnailUrl(lessonToEdit.thumbnail || "");
@@ -115,6 +123,7 @@ function LessonModal({ isOpen, onClose, modules = [], onCreated, lessonToEdit = 
         title: form.title.trim(),
         lesson_order: Number(form.lessonOrder),
         lesson_type: form.lessonType,
+        lesson_level: form.lessonLevel,
         duration: form.duration.trim() || undefined,
         thumbnail: thumbnailUrl || undefined
       };
@@ -219,6 +228,22 @@ function LessonModal({ isOpen, onClose, modules = [], onCreated, lessonToEdit = 
                 {LESSON_TYPES.map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-medium text-[#5c4c72]">
+              Lesson level
+              <select
+                name="lessonLevel"
+                value={form.lessonLevel}
+                onChange={handleChange}
+                className="mt-2 w-full rounded-xl border border-[#e7ddff] px-3 py-2 text-[#2a1840] focus:outline-none focus:border-[#7c5cff] focus:ring-1 focus:ring-[#7c5cff]"
+              >
+                {LESSON_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label}
                   </option>
                 ))}
               </select>

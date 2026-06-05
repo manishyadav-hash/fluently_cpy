@@ -43,6 +43,54 @@ export async function deleteModule(moduleId) {
   });
 }
 
+export async function getCourses() {
+  return request("/api/admin/courses");
+}
+
+export async function getCourseById(courseId) {
+  return request(`/api/admin/courses/${courseId}`);
+}
+
+export async function createCourse(payload) {
+  return request("/api/admin/courses", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateCourse(courseId, payload) {
+  return request(`/api/admin/courses/${courseId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteCourse(courseId) {
+  return request(`/api/admin/courses/${courseId}`, {
+    method: "DELETE"
+  });
+}
+
+export async function addLessonToWeek(weekId, payload) {
+  return request(`/api/admin/courses/weeks/${weekId}/lessons`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function removeLessonFromWeek(weekLessonId) {
+  return request(`/api/admin/courses/week-lessons/${weekLessonId}`, {
+    method: "DELETE"
+  });
+}
+
+export async function reorderWeekLessons(weekId, payload) {
+  return request(`/api/admin/courses/weeks/${weekId}/lessons/reorder`, {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function uploadLessonThumbnail(file) {
   const formData = new FormData();
   formData.append("thumbnail", file);
@@ -63,6 +111,10 @@ export async function uploadLessonThumbnail(file) {
 
 export async function getLessonById(lessonId) {
   return request(`/api/admin/lessons/${lessonId}`);
+}
+
+export async function getAllLessons() {
+  return request("/api/admin/lessons");
 }
 
 export async function createLesson(moduleId, payload) {

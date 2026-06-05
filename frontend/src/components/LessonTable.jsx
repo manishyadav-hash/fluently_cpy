@@ -18,6 +18,7 @@ function LessonTable({ lessons = [], onEdit, onDelete }) {
               <tr>
                 <th className="pb-3">Title</th>
                 <th className="pb-3">Module</th>
+                <th className="pb-3">Level</th>
                 <th className="pb-3">Type</th>
                 <th className="pb-3">Duration</th>
                 <th className="pb-3">Order</th>
@@ -29,6 +30,11 @@ function LessonTable({ lessons = [], onEdit, onDelete }) {
                 <tr key={lesson.id || lesson.title} className="border-t border-[#f0e8ff]">
                   <td className="py-3 font-medium text-[#2a1840]">{lesson.title}</td>
                   <td className="py-3">{lesson.module}</td>
+                  <td className="py-3">
+                    <span className="rounded-full bg-[#eef7ff] px-3 py-1 text-xs font-semibold capitalize text-[#3377c8]">
+                      {lesson.lessonLevel || "beginner"}
+                    </span>
+                  </td>
                   <td className="py-3">
                     <span className="rounded-full bg-[#f0e8ff] px-3 py-1 text-xs font-semibold capitalize text-[#67577f]">
                       {lesson.lessonType}

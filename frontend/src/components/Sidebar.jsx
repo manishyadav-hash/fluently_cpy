@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/" },
+  { label: "Courses", path: "/courses" },
   { label: "Modules", path: "/modules" },
   { label: "Lessons", path: "/lessons" },
   { label: "Questions", path: "/questions" },
