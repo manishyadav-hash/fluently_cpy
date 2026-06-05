@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluently – OTP Login Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #1e293b; border-radius: 12px; padding: 32px; width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,.3); }
+    h1 { font-size: 20px; margin-bottom: 24px; text-align: center; color: #f8fafc; }
+    label { font-size: 13px; color: #94a3b8; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #f8fafc; font-size: 15px; margin-bottom: 16px; outline: none; }
+    input:focus { border-color: #6366f1; }
+    button { width: 100%; padding: 10px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 10px; transition: opacity .15s; }
+    button:hover { opacity: .85; }
+    .btn-send { background: #6366f1; color: #fff; }
+    .btn-verify { background: #22c55e; color: #fff; }
+    #otp-section { display: none; }
+    .log { margin-top: 20px; background: #0f172a; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 13px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+    .log:empty { display: none; }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>OTP Login Test</h1>
+
+    <div id="phone-section">
+      <label>Phone number</label>
+      <input type="text" id="phone" value="+1234567890" />
+      <button class="btn-send" onclick="sendOtp()">Send OTP</button>
+    </div>
+
+    <div id="otp-section">
+      <label>Enter OTP code (hint: 123456)</label>
+      <input type="text" id="code" maxlength="6" placeholder="123456" />
+      <button class="btn-verify" onclick="verifyOtp()">Verify OTP</button>
+      <button class="btn-send" onclick="sendOtp()">Resend OTP</button>
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    const API = window.location.origin + '/api/auth';
+    const log = document.getElementById('log');
+
+    function appendLog(msg, type) {
+      const span = document.createElement('span');
+      span.className = type || '';
+      span.textContent = msg + '\n';
+      log.appendChild(span);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function sendOtp() {
+      const phone = document.getElementById('phone').value;
+      appendLog(`→ POST /api/auth/otp/send  { phone: "${phone}" }`);
+      try {
+        const res = await fetch(API + '/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          appendLog('✓ ' + data.message, 'success');
+          document.getElementById('otp-section').style.display = 'block';
+          document.getElementById('code').focus();
+        } else {
+          appendLog('✗ ' + (data.error || JSON.stringify(data.errors)), 'error');
+        }
+      } catch (e) {
+        appendLog('✗ ' + e.message, 'error');
+      }
+    }
+
+    async function verifyOtp() {
+      const phone = document.getElementById('phone').value;
+      const code = document.getElementById('code').value;
+      appendLog(`→ POST /api/auth/otp/verify  { phone: "${phone}", code: "${code}" }`);
+      try {
+        const res = await fetch(API + '/otp/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, code })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          appendLog('✓ Token received:', 'success');
+          appendLog(data.token, 'success');
+        } else {
+          appendLog('✗ ' + (data.error || JSON.stringify(data.errors)), 'error');
+        }
+      } catch (e) {
+        appendLog('✗ ' + e.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>
