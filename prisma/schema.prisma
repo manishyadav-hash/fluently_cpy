@@ -57,13 +57,16 @@ enum LessonLevel {
 
 model Module {
   id          String   @id @default(uuid()) @db.Uuid
+  courseId    String   @map("course_id") @db.Uuid
   title       String
   description String?
-  weekNo      Int      @unique @map("week_no")
+  weekNo      Int      @map("week_no")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons Lesson[]
 
+  @@unique([courseId, weekNo])
   @@map("modules")
 }
 
@@ -78,6 +81,7 @@ model Course {
   status         CourseStatus  @default(draft)
   createdAt      DateTime      @default(now()) @map("created_at")
 
+  modules Module[]
   weeks Week[]
 
   @@map("courses")
@@ -88,6 +92,7 @@ model Week {
   courseId   String       @map("course_id") @db.Uuid
   weekNo     Int          @map("week_no")
   title      String?
+  thumbnailUrl String?    @map("thumbnail_url")
   createdAt  DateTime     @default(now()) @map("created_at")
 
   course     Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)

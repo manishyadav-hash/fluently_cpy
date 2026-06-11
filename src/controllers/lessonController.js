@@ -192,7 +192,7 @@ const getLessonById = async (req, res) => {
       });
     }
 
-    const lesson = await prisma.lesson.findUnique({
+    const lesson = await prisma.lesson.findFirst({
       where: {
         id: lessonId
       },
@@ -228,6 +228,7 @@ const getLessonById = async (req, res) => {
   } catch (error) {
     console.log(error);
 
+    console.log('getLessonById error:', error);
     return res.status(500).json({
       success: false,
       message: 'Server error'

@@ -7,7 +7,10 @@ const {
   deleteCourse,
   addLessonToWeek,
   removeLessonFromWeek,
-  reorderWeekLessons
+  reorderWeekLessons,
+  createWeek,
+  deleteWeek,
+  updateWeek
 } = require('../controllers/courseController');
 
 const router = express.Router();
@@ -19,6 +22,9 @@ router.delete('/:courseId', deleteCourse);
 router.post('/weeks/:weekId/lessons', addLessonToWeek);
 router.put('/weeks/:weekId/lessons/reorder', reorderWeekLessons);
 router.delete('/week-lessons/:weekLessonId', removeLessonFromWeek);
+router.post('/:courseId/weeks', createWeek);
+router.put('/weeks/:weekId', updateWeek);
+router.delete('/weeks/:weekId', deleteWeek);
 router.get('/:courseId', getCourseDetails);
 
 module.exports = router;
