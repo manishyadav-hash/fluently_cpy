@@ -1,32 +1,34 @@
 const prisma = require('../db/prisma');
+const {
+  weekLessonQuestionInclude,
+  shapeCourseWithLessons,
+  shapeWeekWithLessons,
+  shapeCourseForApp,
+  shapeWeekForApp
+} = require('../utils/lessonPlacement');
 
 const courseInclude = {
-  modules: {
-    orderBy: { weekNo: 'asc' },
-    include: {
-      lessons: {
-        orderBy: { lessonOrder: 'asc' },
-        include: {
-          questions: {
-            orderBy: { questionOrder: 'asc' }
-          }
-        }
-      }
-    }
-  },
   weeks: {
     orderBy: { weekNo: 'asc' },
     include: {
       weekLessons: {
         orderBy: { lessonOrder: 'asc' },
         include: {
-          lesson: {
-            include: {
-              questions: {
-                orderBy: { questionOrder: 'asc' }
-              }
-            }
-          }
+          ...weekLessonQuestionInclude,
+          lesson: true
+        }
+      }
+    }
+  }
+};
+
+const summaryCourseInclude = {
+  weeks: {
+    orderBy: { weekNo: 'asc' },
+    include: {
+      weekLessons: {
+        select: {
+          id: true
         }
       }
     }
@@ -41,22 +43,42 @@ const normalizeCourse = (course) => ({
 });
 
 const getCourseContentSummary = (course) => {
-  const modules = course.modules || [];
   const weeks = course.weeks || [];
-  const hasWeeks = weeks.length > 0;
-  const hasModules = modules.length > 0;
-  const activeUnits = hasWeeks ? weeks : modules;
 
   return {
-    modulesCount: modules.length,
     weeksCount: weeks.length,
-    lessonsCount: activeUnits.reduce((count, unit) => {
-      if (hasWeeks) return count + (unit.weekLessons?.length || 0);
-      if (hasModules) return count + (unit.lessons?.length || 0);
-      return count;
-    }, 0)
+    lessonsCount: weeks.reduce((count, week) => count + (week.weekLessons?.length || 0), 0)
   };
 };
+
+const getWeekLessonWhere = (weekId, item) => {
+  if (item.weekLessonId) {
+    return { id: item.weekLessonId };
+  }
+
+  if (item.placementId) {
+    return { id: item.placementId };
+  }
+
+  return {
+    weekId_lessonId: {
+      weekId,
+      lessonId: item.lessonId || item.id
+    }
+  };
+};
+
+const allowedCourseStatuses = new Set(['draft', 'in_review', 'published', 'archived']);
+
+const normalizeCourseStatusInput = (status) => {
+  if (status === undefined || status === null) {
+    return undefined;
+  }
+
+  const normalized = String(status).trim().toLowerCase().replace(/\s+/g, '_');
+  return normalized === 'inreview' ? 'in_review' : normalized;
+};
+
 //method to create a course with weeks and lessons, get all courses with weeks and lessons count, get course details with weeks and lessons, update course details and weeks, delete course, add lesson to week, remove lesson from week and reorder lessons in a week
 const createCourse = async (req, res) => {
   try {
@@ -71,6 +93,14 @@ const createCourse = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Duration weeks must be a positive integer' });
     }
 
+    const normalizedStatus = normalizeCourseStatusInput(status);
+    if (normalizedStatus !== undefined && !allowedCourseStatuses.has(normalizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course status'
+      });
+    }
+
     const createdCourse = await prisma.course.create({
       data: {
         title,
@@ -79,7 +109,7 @@ const createCourse = async (req, res) => {
         level: level || 'beginner',
         audience: audience || 'general_learner',
         durationWeeks,
-        status: status || 'draft',
+        status: normalizedStatus || 'draft',
         weeks: {
           create: Array.from({ length: durationWeeks }, (_, index) => ({
             weekNo: index + 1,
@@ -90,7 +120,11 @@ const createCourse = async (req, res) => {
       include: courseInclude
     });
 
-    return res.status(201).json({ success: true, message: 'Course created successfully', data: normalizeCourse(createdCourse) });
+    return res.status(201).json({
+      success: true,
+      message: 'Course created successfully',
+      data: shapeCourseWithLessons(normalizeCourse(createdCourse))
+    });
   } catch (error) {
     console.log(error);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -100,32 +134,12 @@ const createCourse = async (req, res) => {
 const getCourses = async (_req, res) => {
   try {
     const courses = await prisma.course.findMany({
-      include: {
-        modules: {
-          orderBy: { weekNo: 'asc' },
-          include: {
-            lessons: {
-              orderBy: { lessonOrder: 'asc' },
-              include: {
-                questions: {
-                  orderBy: { questionOrder: 'asc' }
-                }
-              }
-            }
-          }
-        },
-        weeks: {
-          orderBy: { weekNo: 'asc' },
-          include: {
-            weekLessons: true
-          }
-        }
-      },
+      include: courseInclude,
       orderBy: { createdAt: 'desc' }
     });
 
     const data = courses.map((course) => ({
-      ...normalizeCourse(course),
+      ...shapeCourseWithLessons(normalizeCourse(course)),
       ...getCourseContentSummary(course)
     }));
 
@@ -148,7 +162,59 @@ const getCourseDetails = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Course not found' });
     }
 
-    return res.status(200).json({ success: true, message: 'Course retrieved successfully', data: normalizeCourse(course) });
+    return res.status(200).json({
+      success: true,
+      message: 'Course retrieved successfully',
+      data: shapeCourseWithLessons(normalizeCourse(course))
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+const getCourseAppDetails = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: courseInclude
+    });
+
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Course feed retrieved successfully',
+      data: shapeCourseForApp(normalizeCourse(course))
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+const getCourseWeeksApp = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: courseInclude
+    });
+
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Weeks retrieved successfully',
+      data: {
+        weeks: (course.weeks || []).map((week) => shapeWeekForApp(week))
+      }
+    });
   } catch (error) {
     console.log(error);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -175,7 +241,15 @@ const updateCourse = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Duration weeks must be a positive integer' });
     }
 
-  const updatedCourse = await prisma.$transaction(async (tx) => {
+    const normalizedStatus = normalizeCourseStatusInput(status);
+    if (normalizedStatus !== undefined && !allowedCourseStatuses.has(normalizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid course status'
+      });
+    }
+
+    const updatedCourse = await prisma.$transaction(async (tx) => {
       const result = await tx.course.update({
         where: { id: courseId },
         data: {
@@ -184,7 +258,7 @@ const updateCourse = async (req, res) => {
           ...(thumbnail_url !== undefined ? { thumbnailUrl: thumbnail_url || null } : {}),
           ...(level !== undefined ? { level } : {}),
           ...(audience !== undefined ? { audience } : {}),
-          ...(status !== undefined ? { status } : {}),
+          ...(normalizedStatus !== undefined ? { status: normalizedStatus } : {}),
           ...(duration_weeks !== undefined ? { durationWeeks: nextDurationWeeks } : {})
         },
         include: courseInclude
@@ -197,16 +271,31 @@ const updateCourse = async (req, res) => {
         });
 
         if (nextDurationWeeks > currentWeeks.length) {
-          await tx.week.createMany({
-            data: Array.from({ length: nextDurationWeeks - currentWeeks.length }, (_, index) => ({
+          const usedWeekNos = new Set(currentWeeks.map((week) => week.weekNo));
+          const weeksToCreate = [];
+          let candidateWeekNo = 1;
+
+          while (weeksToCreate.length < nextDurationWeeks - currentWeeks.length) {
+            while (usedWeekNos.has(candidateWeekNo)) {
+              candidateWeekNo += 1;
+            }
+
+            weeksToCreate.push({
               courseId,
-              weekNo: currentWeeks.length + index + 1,
-              title: `Week ${currentWeeks.length + index + 1}`
-            }))
-          });
+              weekNo: candidateWeekNo,
+              title: `Week ${candidateWeekNo}`
+            });
+            usedWeekNos.add(candidateWeekNo);
+            candidateWeekNo += 1;
+          }
+
+          await tx.week.createMany({ data: weeksToCreate });
         } else if (nextDurationWeeks < currentWeeks.length) {
           const weeksToDelete = currentWeeks.slice(nextDurationWeeks).map((week) => week.id);
           if (weeksToDelete.length > 0) {
+            await tx.weekLesson.deleteMany({
+              where: { weekId: { in: weeksToDelete } }
+            });
             await tx.week.deleteMany({
               where: { id: { in: weeksToDelete } }
             });
@@ -223,10 +312,23 @@ const updateCourse = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Course updated successfully',
-      data: normalizeCourse(updatedCourse)
+      data: shapeCourseWithLessons(normalizeCourse(updatedCourse))
     });
   } catch (error) {
-    console.log(error);
+    console.error('Course update failed:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta
+    });
+
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    if (error.code === 'P2002') {
+      return res.status(409).json({ success: false, message: 'A week number already exists for this course' });
+    }
+
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -250,79 +352,6 @@ const deleteCourse = async (req, res) => {
     return res.status(200).json({ success: true, message: 'Course deleted successfully' });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-const addLessonToWeek = async (req, res) => {
-  try {
-    const { weekId } = req.params;
-    const { lesson_id, lessonId, lesson_order, lessonOrder } = req.body;
-    const resolvedLessonId = lesson_id || lessonId;
-    const resolvedLessonOrder = lesson_order ?? lessonOrder;
-
-    if (!weekId || !resolvedLessonId) {
-      return res.status(400).json({ success: false, message: 'Week id, lesson id and lesson order are required' });
-    }
-
-    const [week, lesson] = await Promise.all([
-      prisma.week.findUnique({ where: { id: weekId } }),
-      prisma.lesson.findUnique({ where: { id: resolvedLessonId } })
-    ]);
-
-    if (!week) {
-      return res.status(404).json({ success: false, message: 'Week not found' });
-    }
-
-    if (!lesson) {
-      return res.status(404).json({ success: false, message: 'Lesson not found' });
-    }
-
-    const parsedLessonOrder =
-      resolvedLessonOrder !== undefined && resolvedLessonOrder !== null && resolvedLessonOrder !== ''
-        ? Number(resolvedLessonOrder)
-        : null;
-
-    const maxExistingOrder = await prisma.weekLesson.aggregate({
-      where: { weekId },
-      _max: { lessonOrder: true }
-    });
-
-    const finalLessonOrder = Number.isInteger(parsedLessonOrder) && parsedLessonOrder > 0
-      ? parsedLessonOrder
-      : (maxExistingOrder._max.lessonOrder || 0) + 1;
-
-    const created = await prisma.weekLesson.create({
-      data: {
-        weekId,
-        lessonId: resolvedLessonId,
-        lessonOrder: finalLessonOrder
-      }
-    });
-
-    return res.status(201).json({ success: true, message: 'Lesson added to week successfully', data: created });
-  } catch (error) {
-    console.log(error);
-    if (error.code === 'P2002') {
-      return res.status(409).json({ success: false, message: 'Lesson already exists in this week or order already exists' });
-    }
-    if (error.code === 'P2025') {
-      return res.status(404).json({ success: false, message: 'Week or lesson not found' });
-    }
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
-const removeLessonFromWeek = async (req, res) => {
-  try {
-    const { weekLessonId } = req.params;
-    await prisma.weekLesson.delete({ where: { id: weekLessonId } });
-    return res.status(200).json({ success: true, message: 'Lesson removed from week successfully' });
-  } catch (error) {
-    console.log(error);
-    if (error.code === 'P2025') {
-      return res.status(404).json({ success: false, message: 'Week lesson not found' });
-    }
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -388,7 +417,10 @@ const updateWeek = async (req, res) => {
       include: {
         weekLessons: {
           orderBy: { lessonOrder: 'asc' },
-          include: { lesson: true }
+          include: {
+            ...weekLessonQuestionInclude,
+            lesson: true
+          }
         }
       }
     });
@@ -396,7 +428,7 @@ const updateWeek = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Week updated successfully',
-      data: updatedWeek
+      data: shapeWeekWithLessons(updatedWeek)
     });
   } catch (error) {
     console.log(error);
@@ -446,7 +478,10 @@ const createWeek = async (req, res) => {
       include: {
         weekLessons: {
           orderBy: { lessonOrder: 'asc' },
-          include: { lesson: true }
+          include: {
+            ...weekLessonQuestionInclude,
+            lesson: true
+          }
         }
       }
     });
@@ -454,7 +489,7 @@ const createWeek = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Week created successfully',
-      data: createdWeek
+      data: shapeWeekWithLessons(createdWeek)
     });
   } catch (error) {
     console.log(error);
@@ -484,13 +519,13 @@ const reorderWeekLessons = async (req, res) => {
     await prisma.$transaction([
       ...lessons.map((item, index) =>
         prisma.weekLesson.update({
-          where: { id: item.id },
+          where: getWeekLessonWhere(weekId, item),
           data: { lessonOrder: -(index + 1) }
         })
       ),
       ...lessons.map((item) =>
         prisma.weekLesson.update({
-          where: { id: item.id },
+          where: getWeekLessonWhere(weekId, item),
           data: { lessonOrder: item.lessonOrder }
         })
       )
@@ -498,9 +533,21 @@ const reorderWeekLessons = async (req, res) => {
 
     const updatedWeek = await prisma.week.findUnique({
       where: { id: weekId },
-      include: { weekLessons: { orderBy: { lessonOrder: 'asc' }, include: { lesson: true } } }
+      include: {
+        weekLessons: {
+          orderBy: { lessonOrder: 'asc' },
+          include: {
+            ...weekLessonQuestionInclude,
+            lesson: true
+          }
+        }
+      }
     });
-    return res.status(200).json({ success: true, message: 'Week lessons reordered successfully', data: updatedWeek });
+    return res.status(200).json({
+      success: true,
+      message: 'Week lessons reordered successfully',
+      data: shapeWeekWithLessons(updatedWeek)
+    });
   } catch (error) {
     console.log(error);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -511,10 +558,10 @@ module.exports = {
   createCourse,
   getCourses,
   getCourseDetails,
+  getCourseAppDetails,
+  getCourseWeeksApp,
   updateCourse,
   deleteCourse,
-  addLessonToWeek,
-  removeLessonFromWeek,
   reorderWeekLessons,
   createWeek,
   deleteWeek,

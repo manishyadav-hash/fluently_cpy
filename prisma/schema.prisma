@@ -46,28 +46,15 @@ enum CourseAudience {
 
 enum CourseStatus {
   draft
+  in_review
   published
+  archived
 }
 
 enum LessonLevel {
   beginner
   intermediate
   advanced
-}
-
-model Module {
-  id          String   @id @default(uuid()) @db.Uuid
-  courseId    String   @map("course_id") @db.Uuid
-  title       String
-  description String?
-  weekNo      Int      @map("week_no")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessons Lesson[]
-
-  @@unique([courseId, weekNo])
-  @@map("modules")
 }
 
 model Course {
@@ -81,63 +68,59 @@ model Course {
   status         CourseStatus  @default(draft)
   createdAt      DateTime      @default(now()) @map("created_at")
 
-  modules Module[]
   weeks Week[]
 
   @@map("courses")
 }
 
 model Week {
-  id         String       @id @default(uuid()) @db.Uuid
-  courseId   String       @map("course_id") @db.Uuid
-  weekNo     Int          @map("week_no")
-  title      String?
-  thumbnailUrl String?    @map("thumbnail_url")
-  createdAt  DateTime     @default(now()) @map("created_at")
+  id           String   @id @default(uuid()) @db.Uuid
+  courseId     String   @map("course_id") @db.Uuid
+  weekNo       Int      @map("week_no")
+  title        String?
+  thumbnailUrl String?  @map("thumbnail_url")
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  course     Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   weekLessons WeekLesson[]
 
   @@unique([courseId, weekNo])
   @@map("weeks")
 }
 
+model Lesson {
+  id          String      @id @default(uuid()) @db.Uuid
+  title       String
+  lessonLevel LessonLevel @default(beginner) @map("lesson_level")
+  lessonType  LessonType  @default(mixed) @map("lesson_type")
+  thumbnail   String?     @map("thumbnail")
+  duration    String?     @map("duration")
+  contentBlocks Json?     @map("content_blocks")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  weekLessons WeekLesson[]
+
+  @@map("lessons")
+}
+
 model WeekLesson {
-  id          String   @id @default(uuid()) @db.Uuid
-  weekId      String   @map("week_id") @db.Uuid
-  lessonId    String   @map("lesson_id") @db.Uuid
-  lessonOrder Int      @map("lesson_order")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id         String   @id @default(uuid()) @db.Uuid
+  weekId     String   @map("week_id") @db.Uuid
+  lessonId   String   @map("lesson_id") @db.Uuid
+  lessonOrder Int     @map("lesson_order")
+  contentBlocks Json? @map("content_blocks")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   week   Week   @relation(fields: [weekId], references: [id], onDelete: Cascade)
   lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questionLinks WeekLessonQuestion[]
 
   @@unique([weekId, lessonId])
   @@unique([weekId, lessonOrder])
   @@map("week_lessons")
 }
 
-model Lesson {
-  id          String   @id @default(uuid()) @db.Uuid
-  moduleId    String   @map("module_id") @db.Uuid
-  title       String
-  lessonLevel LessonLevel @default(beginner) @map("lesson_level")
-  lessonType  LessonType @default(mixed) @map("lesson_type")
-  thumbnail   String?  @map("thumbnail")
-  duration    String?  @map("duration")
-  lessonOrder Int      @map("lesson_order")
-  createdAt   DateTime @default(now()) @map("created_at")
-  module    Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  questions Question[]
-  weekLessons WeekLesson[]
-
-  @@unique([moduleId, lessonOrder])
-  @@map("lessons")
-}
-
 model Question {
   id            String       @id @default(uuid()) @db.Uuid
-  lessonId      String       @map("lesson_id") @db.Uuid
   questionType  QuestionType @map("question_type")
   question      String
   audioUrl      String?      @map("audio_url")
@@ -146,12 +129,26 @@ model Question {
   questionOrder Int          @map("question_order")
   createdAt     DateTime     @default(now()) @map("created_at")
 
-  lesson   Lesson           @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  options  QuestionOption[]
-  attempts QuestionAttempt[]
+  placements WeekLessonQuestion[]
+  options    QuestionOption[]
+  attempts   QuestionAttempt[]
 
-  @@unique([lessonId, questionOrder])
   @@map("questions")
+}
+
+model WeekLessonQuestion {
+  id            String   @id @default(uuid()) @db.Uuid
+  weekLessonId  String   @map("week_lesson_id") @db.Uuid
+  questionId    String   @map("question_id") @db.Uuid
+  questionOrder Int      @map("question_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  weekLesson WeekLesson @relation(fields: [weekLessonId], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([weekLessonId, questionId])
+  @@unique([weekLessonId, questionOrder])
+  @@map("week_lesson_questions")
 }
 
 model QuestionOption {

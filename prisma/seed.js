@@ -10,12 +10,17 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  await prisma.module.deleteMany();
+  await prisma.questionAttempt.deleteMany();
+  await prisma.questionOption.deleteMany();
+  await prisma.question.deleteMany();
+  await prisma.lesson.deleteMany();
+  await prisma.week.deleteMany();
+  await prisma.course.deleteMany();
 
   const course = await prisma.course.create({
     data: {
       title: 'Fluently Starter Course',
-      description: 'Auto-created course to hold seeded modules.',
+      description: 'Auto-created course to hold seeded weeks.',
       level: 'beginner',
       audience: 'general_learner',
       durationWeeks: 5,
@@ -23,7 +28,7 @@ async function main() {
     }
   });
 
-  const modules = [
+  const weeks = [
     {
       title: 'Greetings and Introductions',
       description: 'Learn how to greet people and introduce yourself.',
@@ -178,15 +183,15 @@ async function main() {
     }
   ];
 
-  for (const moduleData of modules) {
-    await prisma.module.create({
+  for (const weekData of weeks) {
+    await prisma.week.create({
       data: {
-        title: moduleData.title,
-        description: moduleData.description,
-        weekNo: moduleData.weekNo,
+        title: weekData.title,
+        description: weekData.description,
+        weekNo: weekData.weekNo,
         courseId: course.id,
         lessons: {
-          create: moduleData.lessons.map((lesson) => ({
+          create: weekData.lessons.map((lesson) => ({
             title: lesson.title,
             lessonLevel: lesson.lessonLevel,
             lessonType: lesson.lessonType,
@@ -215,7 +220,7 @@ async function main() {
   }
 
   console.log(`Seeded course: ${course.title}`);
-  console.log(`Seeded modules: ${modules.length}`);
+  console.log(`Seeded weeks: ${weeks.length}`);
 }
 
 main()
