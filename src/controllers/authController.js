@@ -52,7 +52,7 @@ const sendOtp = async (req, res) => {
       message: 'OTP sent successfully',
       data: {
         mobileNumber,
-        otp: process.env.NODE_ENV === 'production' ? undefined : otp,
+        otp,
         expiresAt
       }
     });
