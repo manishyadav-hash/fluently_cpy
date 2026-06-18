@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const courseRoutes = require('./routes/courseRoute');
+const authRoutes = require('./routes/authRoute');
 const lessonRoutes = require('./routes/lessonRoute');
 const questionRoutes = require('./routes/questionRoute');
 const questionOptionRoutes = require('./routes/questionOptionRoute');
@@ -20,6 +21,7 @@ app.get('/', (req, res) => {
 app.get('/api/admin/courses/:courseId/app', getCourseAppDetails);
 app.get('/api/admin/courses/:courseId/weeks/app', getCourseWeeksApp);
 app.get('/api/admin/course-app/:courseId', getCourseAppDetails);
+app.use('/api/app', authRoutes);
 app.use('/api/admin/courses', courseRoutes);
 app.use('/api/admin', lessonRoutes);
 app.use('/api/admin', questionRoutes);
